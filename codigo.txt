@@ -1,0 +1,162 @@
+/* Segundo Parcial SPD 1D Schmidt Katerina */
+
+#include <IRremote.h>
+#include <LiquidCrystal.h>
+#include <Servo.h>
+
+//Control IR
+#define RECEPTOR_IR_PIN 11  
+#define IR_BOTON_ON 0
+#define IR_BOTON_STOP 2
+int comandoIngresado;
+int alarmaEncendida = 0;
+int alarmaApagada = 1;
+
+//Sensor temperatura
+#define SENSOR_TEMP_PIN 0
+float lecturaTemp = 0;
+
+//LCD 
+LiquidCrystal lcd(10,8,4,5,6,7);
+
+//SERVO
+#define SERVO_PIN 9
+Servo myServo;
+int posicionServo = 0;
+
+//LEDS
+#define LED_ROJO 13
+#define LED_VERDE 12
+
+//Activar sistema de incendios: Boton rojo: Numero que imprime: 0
+//Desactivar sistema de incendios: Boton FUNC/STOP: Num q imprime: 2
+
+int umbralIncendio = 60;
+
+//PROTOTIPOS DE FUNCIONES:
+void prenderLed(int led);
+void apagarLed(int led);
+void mostrarTemperatura(int temperatura);
+void representarEstacion(int temp, int tempMin, int tempMax, int estacion);
+
+
+void setup()
+{
+  Serial.begin(9600);
+  IrReceiver.begin(RECEPTOR_IR_PIN);    //inicializamos el receptor
+  lcd.begin(16,2);                      //Inicializamos la interface para el LCD y determinamos sus dimensiones  
+  myServo.attach(SERVO_PIN,500,2500);
+  myServo.write(posicionServo);
+  pinMode(LED_ROJO, OUTPUT);
+  pinMode(LED_VERDE, OUTPUT);
+}
+
+void loop()
+{ 
+  lecturaTemp = map(analogRead(SENSOR_TEMP_PIN),20,350,-40,125);
+  
+  lcd.setCursor(0,0);
+  lcd.print(lecturaTemp);
+  
+  if(lecturaTemp > umbralIncendio || alarmaEncendida == 1)
+  {
+    lcd.setCursor(0,1);
+    lcd.print("ALERTA!INCENDIO!");
+    prenderLed(LED_VERDE);
+    apagarLed(LED_ROJO);
+    delay(1000);
+    for(posicionServo=0; posicionServo<=180; posicionServo++)
+    {
+      myServo.write(posicionServo);
+      delay(30);
+    }
+    lcd.clear();
+  }
+  else
+  {
+    prenderLed(LED_ROJO);
+    apagarLed(LED_VERDE);
+    if(lecturaTemp >= -10 && lecturaTemp < 40)
+    {
+      representarEstacion(lecturaTemp,-10, 6, 1);
+      representarEstacion(lecturaTemp,12, 19, 2);
+      representarEstacion(lecturaTemp,18, 40, 3);
+      representarEstacion(lecturaTemp,6, 12, 4);
+    }
+    else
+    {
+      lcd.setCursor(0,1);
+      lcd.print("Temp anormal"); 
+      delay(1000);
+      lcd.clear();
+    }
+  }
+
+  if(IrReceiver.decode())              //comprobamos si hay nuevos datos
+  {
+    IrReceiver.resume();               //recibe el siguiente dato
+    comandoIngresado = IrReceiver.decodedIRData.command;
+    switch(comandoIngresado) 
+    {
+      case 0:
+      	alarmaEncendida = 1;
+      	alarmaApagada = 0;
+      	Serial.println("Se ha activado la alarma de incendios");
+        break;
+      
+      case 2: 
+        alarmaApagada = 1;
+        alarmaEncendida = 0;
+        Serial.println("Se ha desactivado la alarma de incendios");
+        break;
+    }
+  }
+}
+
+
+//DESARROLLO DE FUNCIONES
+//Funcion para encerder un led
+void prenderLed(int led)
+{
+  digitalWrite(led, HIGH);
+}
+
+
+//Funcion para apagar un led
+void apagarLed(int led)
+{
+  digitalWrite(led, LOW);
+}
+
+
+//Funcion para representar en el display cada estacion del anio
+void representarEstacion(int temp,int tempMin, int tempMax, int estacion)
+{
+  if(temp >= tempMin && temp < tempMax)
+  {
+    lcd.setCursor(0,1);
+    switch(estacion)
+    {
+      case 1:
+      	lcd.print("Invierno");
+		delay(1000);
+      	lcd.clear();
+      	break;
+      case 2:
+      	lcd.print("Primavera");
+        delay(1000);
+      	lcd.clear();
+      	break;
+      case 3:
+      	lcd.print("Verano");
+      	delay(1000);
+      	lcd.clear();
+      	break;
+      case 4:
+      	lcd.print("Otonio");
+      	delay(1000);
+      	lcd.clear();
+      	break;
+    }
+  }
+}
